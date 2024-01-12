@@ -17,11 +17,6 @@ class Ball:
         self.radius = radius
         self.v = np.array(velocity)
         self.r = np.array(r)
-        self.x = r[0]
-        self.y = r[1]
-        self.vx = self.v[0]
-        self.vy = self.v[1]
-        pygame.draw.circle(screen, pygame.Color("white"), (self.x, self.y), self.radius)
 
     def move(self):
         self.r = self.r + self.v
