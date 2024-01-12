@@ -17,6 +17,8 @@ class Ball:
         self.radius = radius
         self.v = np.array(velocity)
         self.r = np.array(r)
+        self.x = r[0]
+        self.y = r[1]
 
     def move(self):
         self.r = self.r + self.v
@@ -26,7 +28,7 @@ min_distance = 15
 list_balls = []
 for _ in range(amount_balls):
     while True:
-        ball = Ball(7, (1, 1),
+        ball = Ball(7, (randint(-1, 4), randint(-2, 3)),
                     (random.randint(7, 400 - 7), random.randint(307, 600 - 7)))
         overlapping = False
         for other_ball in list_balls:
@@ -55,8 +57,6 @@ def check_collision(ball_1, ball_2):
         r2 = ball_2.r
         ball_1.v = v1 - (r1 - r2) * ((v1 - v2) @ (r1 - r2)) / (np.linalg.norm(r1 - r2)) ** 2
         ball_2.v = v2 - (r2 - r1) * ((v2 - v1) @ (r2 - r1)) / (np.linalg.norm(r2 - r1)) ** 2
-        # ball_1.vx, ball_2.vx = ball_2.vx, ball_1.vx
-        # ball_1.vy, ball_2.vy = ball_2.vy, ball_1.vy
 
 
 def check_energy():
