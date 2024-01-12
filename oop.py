@@ -53,12 +53,11 @@ def check_wall(ball):
 
 
 def check_collision(ball_1, ball_2):
-    distance = np.linalg.norm(ball_1.r - ball_2.r)
-    v1 = ball_1.v
-    v2 = ball_2.v
-    r1 = ball_1.r
-    r2 = ball_2.r
-    if distance <= ball_1.radius + ball_2.radius + 1:
+    if np.linalg.norm(ball_1.r - ball_2.r) <= ball_1.radius + ball_2.radius + 1:
+        v1 = ball_1.v
+        v2 = ball_2.v
+        r1 = ball_1.r
+        r2 = ball_2.r
         ball_1.v = v1 - (r1 - r2) * ((v1 - v2) @ (r1 - r2)) / (np.linalg.norm(r1 - r2)) ** 2
         ball_2.v = v2 - (r2 - r1) * ((v2 - v1) @ (r2 - r1)) / (np.linalg.norm(r2 - r1)) ** 2
         # ball_1.vx, ball_2.vx = ball_2.vx, ball_1.vx
