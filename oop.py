@@ -9,6 +9,7 @@ import numpy as np
 amount_balls = int(input())
 pygame.init()
 screen = pygame.display.set_mode((800, 600))
+w, h = pygame.display.get_surface().get_size()
 screen.fill((0, 0, 0))
 
 
@@ -29,7 +30,7 @@ list_balls = []
 for _ in range(amount_balls):
     while True:
         ball = Ball(7, (randint(-1, 4), randint(-2, 3)),
-                    (random.randint(7, 400 - 7), random.randint(307, 600 - 7)))
+                    (random.randint(7, w // 2 - 7), random.randint(307, h - 7)))
         overlapping = False
         for other_ball in list_balls:
             distance = ((ball.x - other_ball.x) ** 2 + (ball.y - other_ball.y) ** 2) ** 0.5
@@ -71,6 +72,11 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+        if event.type == pygame.KEYDOWN and event.key == 13:
+            running = False
+        if event.type == pygame.KEYDOWN and event.key == 102:
+            screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+            w, h = pygame.display.get_surface().get_size()
 
         screen.fill((0, 0, 0))
 
@@ -84,7 +90,7 @@ while running:
                 check_collision(list_balls[i], list_balls[j])
 
     pygame.display.flip()
-    # pygame.time.delay(10)
+    pygame.time.delay(10)
     clock.tick(30)
 
 pygame.quit()
