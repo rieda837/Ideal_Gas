@@ -43,7 +43,7 @@ min_distance = 15
 list_balls = [] * amount_balls
 for _ in range(amount_balls):
     while True:
-        ball = Ball(4, (random.randint(-5, 5), random.randint(-5, 5)),
+        ball = Ball(4, (6, 6),
                     (random.randint(6, screen_size // 2 - 6), random.randint(screen_size // 2 + 6, screen_size - 5)), 1)
         overlapping = False
         for other_ball in list_balls:
@@ -85,8 +85,12 @@ def check_collision(ball_1, ball_2):
         r2 = ball_2.r
         m1 = ball_1.mass
         m2 = ball_2.mass
-        ball_1.v = v1 - 2 * m2 / (m1 + m2) * (r1 - r2) * ((v1 - v2) @ (r1 - r2)) / ((r1 - r2)[0] ** 2 + (r1 - r2)[1] ** 2)
-        ball_2.v = v2 - 2 * m1 / (m1 + m2) * (r2 - r1) * ((v2 - v1) @ (r2 - r1)) / ((r2 - r1)[0] ** 2 + (r2 - r1)[1] ** 2)
+        d_r1 = r1 - r2
+        d_v1 = v1 - v2
+        d_r2 = r2 - r1
+        d_v2 = v2 - v1
+        ball_1.v = v1 - 2 * m2 / (m1 + m2) * d_r1 * (d_v1 @ d_r1) / (d_r1[0] ** 2 + d_r1[1] ** 2)
+        ball_2.v = v2 - 2 * m1 / (m1 + m2) * d_r2 * (d_v2 @ d_r2) / (d_r2[0] ** 2 + d_r2[1] ** 2)
         # доделать как wall_collision
         # ball_1.r  = ball_1.r + ball_1.radius
         # ball_2.r = ball_2.r + ball_2.radius
@@ -110,13 +114,19 @@ def isochoric():
     plt.scatter(p, T)
 
 
+def press_v_quad(m_p, c):
+    list_v_quad = [97.8121, 31.9225, 17.9776, 8.0089, 50, 72]
+    list_press = [6561.72710, 2155.99124, 1217.93083, 534.31129, 3319.58497, 4826.16759]
+    plt.xlabel('v_quad')
+    plt.ylabel('mean pressure')
+    plt.scatter(list_v_quad, list_press)
+
+
 vels = [None] * amount_balls
-for i in range(amount_balls):
-    vels[i] = (list_balls[i].v[0] ** 2 + list_balls[i].v[1] ** 2) ** 0.5
 
 
 def speed_distribution():
-    plt.hist(vels, bins=11, density=True,  label="Simulation Data")
+    plt.hist(vels, bins=15, density=True,  label="Simulation Data")
     plt.xlabel('speed')
     plt.ylabel('amount')
     plt.legend(loc="upper right")
@@ -125,8 +135,10 @@ def speed_distribution():
 change_pos = pygame.USEREVENT + 1
 pygame.time.set_timer(change_pos, 10)
 clock = pygame.time.Clock()
-running = True
 t = 0
+count_press = 0
+mean_pressure = 0
+running = True
 while running:
     t += 1
     for event in pygame.event.get():
@@ -146,6 +158,9 @@ while running:
         if event.type == pygame.KEYDOWN and event.key == pygame.K_h:
             isochoric()
             plt.show()
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_k:
+            press_v_quad(mean_pressure, count_press)
+            plt.show()
 
     screen.fill((0, 0, 0))
 
@@ -154,6 +169,7 @@ while running:
         ball.move()
         wall_collision(ball)
     for i in range(amount_balls):
+        vels[i] = (list_balls[i].v[0] ** 2 + list_balls[i].v[1] ** 2) ** 0.5
         for j in range(i + 1, amount_balls):
             check_collision(list_balls[i], list_balls[j])
     A = screen_size ** 2
@@ -162,16 +178,20 @@ while running:
     l = screen_size
     p = press_velocity / t
     T = p * A / (k * N)
-    v2 = 0
+    v_quad = 0
     for i in range(amount_balls):
-        v2 += list_balls[i].v[0] ** 2 + list_balls[i].v[1] ** 2
+        v_quad += list_balls[i].v[0] ** 2 + list_balls[i].v[1] ** 2
     if t == 100:
+        count_press += 1
         print(str(press_velocity).replace('.', ','))
+        mean_pressure += press_velocity
         t = 0
         press_velocity = 0
+    # print(energy)
     clock.tick(30)
     pygame.display.flip()
 pygame.quit()
+print(v_quad / N)
 
 # def except_hook(cls, exception, traceback):
 #     sys.__excepthook__(cls, exception, traceback)
