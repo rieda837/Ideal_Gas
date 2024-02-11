@@ -104,22 +104,20 @@ energy = []
 
 
 def isochoric():
-    A = screen_size ** 2
-    k = 1
-    N = amount_balls
-    l = screen_size
     # p * A = k * N * T
     p = press_velocity / t
     T = p * A / (k * N)
     plt.scatter(p, T)
 
 
-def press_v_quad(m_p, c):
+def press_v_quad():
     list_v_quad = [97.8121, 31.9225, 17.9776, 8.0089, 50, 72]
     list_press = [6561.72710, 2155.99124, 1217.93083, 534.31129, 3319.58497, 4826.16759]
+    err = [250] * 6
     plt.xlabel('v_quad')
     plt.ylabel('mean pressure')
     plt.scatter(list_v_quad, list_press)
+    plt.errorbar(list_v_quad, list_press, yerr=err, fmt='o')
 
 
 vels = [None] * amount_balls
@@ -159,7 +157,7 @@ while running:
             isochoric()
             plt.show()
         if event.type == pygame.KEYDOWN and event.key == pygame.K_k:
-            press_v_quad(mean_pressure, count_press)
+            press_v_quad()
             plt.show()
 
     screen.fill((0, 0, 0))
@@ -178,9 +176,7 @@ while running:
     l = screen_size
     p = press_velocity / t
     T = p * A / (k * N)
-    v_quad = 0
-    for i in range(amount_balls):
-        v_quad += list_balls[i].v[0] ** 2 + list_balls[i].v[1] ** 2
+    v_quad = sum([list_balls[i].v[0] ** 2 + list_balls[i].v[1] ** 2 for i in range(amount_balls)])
     if t == 100:
         count_press += 1
         print(str(press_velocity).replace('.', ','))
