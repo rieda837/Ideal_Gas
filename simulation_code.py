@@ -39,12 +39,14 @@ class Game:
         self.k = 1
         self.N = self.amount_balls
         self.p = self.press_velocity
+        self.list_enegry = []
+        self.t_2 = 0
 
     def spawn_particles(self):
         min_distance = 15
         for _ in range(self.amount_balls):
             while True:
-                ball = Particle(4, (2, 2), (random.randint(6, self.screen_size // 2 - 6),
+                ball = Particle(4, (5, 5), (random.randint(6, self.screen_size // 2 - 6),
                                             random.randint(self.screen_size // 2 + 6, self.screen_size - 5)), 1)
                 overlapping = False
                 for other_ball in self.list_balls:
@@ -75,7 +77,7 @@ class Game:
             ball.r[1] = ball.r[1] - ball.radius
             self.press_velocity += abs(ball.v[1]) * 2
 
-    def check_collision(self, ball_1, ball_2):
+    def particle_collision(self, ball_1, ball_2):
         if ((ball_1.r - ball_2.r)[0] ** 2 + (ball_1.r - ball_2.r)[1] ** 2) <= 1.04*(ball_1.radius + ball_2.radius) ** 2:
             v1 = ball_1.v
             v2 = ball_2.v
@@ -96,6 +98,10 @@ class Game:
     def total_energy(self):
         return sum([self.list_balls[i].mass / 2 * self.list_balls[i].plot_vel_norm[i] ** 2
                     for i in range(len(self.list_balls))])
+
+    def energy_conserv(self, t):
+        self.t_2 += t
+        plt.plot(self.t_2, self.list_enegry)
 
     def isochoric(self):
         pass
@@ -120,12 +126,12 @@ class Game:
         plt.title('speed distribution')
         v_quad = sum([self.list_balls[i].v[0] ** 2 + self.list_balls[i].v[1] ** 2 for i in
                       range(self.amount_balls)]) / self.amount_balls
-        # v = np.linspace(0, 10, 120)
-        # E = self.total_energy()
-        # Average_E = E / len(self.list_balls)
-        # T = 2 * Average_E / (2 * self.k)
-        # fv =  m*np.exp(-m*v**2/(2*T* self.k))/(2*np.pi*T * self.k)*2*np.pi*v
-        # plt.plot(v, fv)
+        v = np.linspace(0, 10, 120)
+        E = self.total_energy()
+        Average_E = E / len(self.list_balls)
+        T = 2 * Average_E / (2 * self.k)
+        fv = self.N * (2 * v / v_quad ** 2) * np.exp(-v ** 2 / v_quad ** 2)
+        plt.plot(v, fv)
 
     def loop(self):
         clock = pygame.time.Clock()
@@ -141,24 +147,26 @@ class Game:
             #     screen = pygame.display.set_mode((screen_size, screen_size))
 
         self.screen.fill((0, 0, 0))
-
+        t +=  1
         for ball in self.list_balls:
             pygame.draw.circle(self.screen, pygame.Color("white"), ball.r, ball.radius)
             ball.move()
             self.wall_collision(ball)
-            t += 1
+            # print(t)
         for i in range(self.amount_balls):
             self.vels[i] = (self.list_balls[i].v[0] ** 2 + self.list_balls[i].v[1] ** 2) ** 0.5
             for j in range(i + 1, self.amount_balls):
-                self.check_collision(self.list_balls[i], self.list_balls[j])
-            t += 1
+                self.particle_collision(self.list_balls[i], self.list_balls[j])
         v_quad = 0
         for i in range(self.amount_balls):
             v_quad += self.list_balls[i].v[0] ** 2 + self.list_balls[i].v[1] ** 2
+        print(t)
         if t == 100:
             print(str(self.press_velocity).replace('.', ','))
+            self.energy_conserv(t)
             t = 0
             self.press_velocity = 0
+
         clock.tick(30)
         pygame.display.flip()
 
@@ -176,7 +184,7 @@ class GameWidget(QWidget):
         # if box.text() != '0':
         #     self.game = Game(amount=int(box.text()))
         #     self.game.spawn_particles()
-        self.game = Game(amount=200)
+        self.game = Game(amount=250)
         self.game.spawn_particles()
         grid = QGridLayout(self)
         grid.setContentsMargins(1, 1, 1, 1)
@@ -212,7 +220,6 @@ class GameWidget(QWidget):
 
 
 if __name__ == "__main__":
-    import sys
 
     app = QApplication(sys.argv)
     w = GameWidget()
