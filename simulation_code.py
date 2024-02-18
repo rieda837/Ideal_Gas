@@ -3,7 +3,8 @@ import sys
 import random
 import matplotlib.pyplot as plt
 import numpy as np
-from PyQt5.QtWidgets import QApplication, QWidget, QGridLayout, QSpinBox, QPushButton
+from PyQt5 import QtGui
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QSpinBox, QPushButton
 from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QImage, QPainter
 
@@ -16,11 +17,6 @@ class Particle:
         self.x = r[0]
         self.y = r[1]
         self.mass = mass
-
-        self.vel_norm = (self.v[0] ** 2 + self.v[1] ** 2) ** 0.5
-        # self.plot_r = [np.copy(self.r)]
-        # self.plot_vel = [np.copy(self.v)]
-        # self.plot_vel_norm = [((np.copy(self.v))[0] ** 2 + (np.copy(self.v))[1] ** 2) ** 0.5]
 
     def move(self):
         self.r = self.r + self.v
@@ -46,6 +42,7 @@ class Game:
         self.v_quad = 0
         self.energy = 0
         self.t = 0
+        self.T = 0
 
     def spawn_particles(self):
         min_distance = 15
@@ -100,12 +97,8 @@ class Game:
             # ball_1.r  = ball_1.r + ball_1.radius
             # ball_2.r = ball_2.r + ball_2.radius
 
-    def pressure(self):
-        print(self.press_velocity)
-
     def temperature(self):
-        T = self.energy / self.k
-        print(T)
+        self.T = self.energy / self.k
 
     def total_energy(self):
         self.energy = sum([self.list_balls[i].mass / 2 * (self.list_balls[i].v[0] ** 2 + self.list_balls[i].v[1] ** 2)
@@ -135,13 +128,14 @@ class Game:
     def speed_distribution(self):
         v = np.arange(0., 30, 0.2)
         plt.figure(figsize=(10, 8))
-        plt.hist(self.vels, bins=15, density=True, label="Velocity distribution")
-        plt.xlabel('speed')
-        plt.ylabel('amount')
-        plt.legend(loc='upper right')
-        plt.title('speed distribution')
+        plt.hist(self.vels, bins=15, density=True, label="Численное моделирование")
+        plt.xlabel('Скорость', fontsize=20)
+        plt.ylabel('Плотность вероятности', fontsize=20)
+        plt.tick_params(axis='both', which='major', labelsize=17)
+        plt.title('Распределение частиц по скоростям', fontsize=25)
         plt.plot(v, (2 * v / self.v_quad ** 2) * np.exp(-v ** 2 / self.v_quad ** 2), 'r--', linewidth=5,
                  label="Распределение Больцмана-Максвелла")
+        plt.legend(loc='upper right', fontsize=15)
 
     def loop(self):
         clock = pygame.time.Clock()
@@ -178,30 +172,55 @@ class Game:
 class GameWidget(QWidget):
     def __init__(self):
         super().__init__()
-        gr_press = QPushButton()
-        gr_press.setText('Давление')
-        gr_speed_d = QPushButton()
-        gr_speed_d.setText('Распределение\nскоростей')
-        box = QSpinBox()
-        box.setMaximum(500)
-        box.setMinimum(1)
-        # if box.text() != '0':
-        #     self.game = Game(amount=int(box.text()))
-        #     self.game.spawn_particles()
-        self.game = Game(amount=100)
-        self.game.spawn_particles()
-        grid = QGridLayout(self)
-        grid.setContentsMargins(1, 1, 1, 1)
-        grid.setColumnStretch(1, 8)
-        grid.addWidget(box, 1, 3, 1, 1)
-        grid.addWidget(gr_press, 2, 3, 1, 1)
-        grid.addWidget(gr_speed_d, 3, 3, 1, 1)
+        self.box = QSpinBox(self)
+        self.box.move(720, 100)
+        self.box.resize(130, 30)
+        self.box.setMaximum(500)
+        self.box.setMinimum(1)
 
+        self.c = 0
+
+        gr_press = QPushButton(self)
+        gr_press.move(720, 150)
+        gr_press.resize(130, 50)
+        gr_press.setText('Давление')
+        gr_press.setFont(QtGui.QFont("Times", 12))
+        gr_press.clicked.connect(self.show_Press)
+
+        gr_speed_d = QPushButton(self)
+        gr_speed_d.move(720, 210)
+        gr_speed_d.resize(130, 50)
+        gr_speed_d.setText('Распределение\nскоростей')
+        gr_speed_d.setFont(QtGui.QFont("Times", 11))
+        gr_speed_d.clicked.connect(self.show_speed_distrib)
+
+        start = QPushButton(self)
+        start.move(600, 520)
+        start.resize(250, 80)
+        start.setText('Начать\nмоделирование')
+        start.setFont(QtGui.QFont("Times", 13, QtGui.QFont.Bold))
+        start.clicked.connect(self.start_simulation)
+
+        self.game = Game(amount=100)
+
+        self.label_temp = QLabel(self)
+        self.label_temp.move(600, 260)
+        self.label_temp.resize(244, 50)
+        self.label_temp.setText(f'Температура: {str(self.game.T)}')
+        self.label_temp.setFont(QtGui.QFont("Times", 10))
+
+        self.label_press = QLabel(self)
+        self.label_press.move(600, 300)
+        self.label_press.resize(247, 50)
+        self.label_press.setText(f'Давление: {str(self.game.press_velocity)}')
+        self.label_press.setFont(QtGui.QFont("Times", 10))
+
+    def start_simulation(self):
+        self.game = Game(amount=int(self.box.text()))
+        self.game.spawn_particles()
         self.timer = QTimer()
         self.timer.timeout.connect(self.pygame_loop)
         self.timer.start(40)
-        gr_press.clicked.connect(self.show_Press)
-        gr_speed_d.clicked.connect(self.show_speed_distrib)
 
     def show_Press(self):
         self.game.fluct_pressure()
@@ -213,6 +232,10 @@ class GameWidget(QWidget):
 
     def pygame_loop(self):
         self.game.loop()
+        print(self.game.t)
+        self.label_temp.setText(f'Температура: {str(self.game.T)}')
+        if self.game.t == 49:
+            self.label_press.setText(f'Давление: {str(self.game.press_velocity)}')
         self.update(0, 0, 600, 600)
 
     def paintEvent(self, e):
