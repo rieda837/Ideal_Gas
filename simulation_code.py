@@ -3,9 +3,9 @@ import sys
 import random
 import matplotlib.pyplot as plt
 import numpy as np
-from PyQt5.QtWidgets import QApplication, QWidget, QGridLayout, QSpinBox, QLineEdit, QPushButton
+from PyQt5.QtWidgets import QApplication, QWidget, QGridLayout, QSpinBox, QPushButton
 from PyQt5.QtCore import QTimer
-from PyQt5.QtGui import QImage, QPainter, QPixmap
+from PyQt5.QtGui import QImage, QPainter
 
 
 class Particle:
@@ -17,9 +17,10 @@ class Particle:
         self.y = r[1]
         self.mass = mass
 
-        self.plot_r = [np.copy(self.r)]
-        self.plot_vel = [np.copy(self.v)]
-        self.plot_vel_norm = [((np.copy(self.v))[0] ** 2 + (np.copy(self.v))[1] ** 2) ** 0.5]
+        self.vel_norm = (self.v[0] ** 2 + self.v[1] ** 2) ** 0.5
+        # self.plot_r = [np.copy(self.r)]
+        # self.plot_vel = [np.copy(self.v)]
+        # self.plot_vel_norm = [((np.copy(self.v))[0] ** 2 + (np.copy(self.v))[1] ** 2) ** 0.5]
 
     def move(self):
         self.r = self.r + self.v
@@ -39,9 +40,11 @@ class Game:
         self.k = 1
         self.N = self.amount_balls
         self.p = self.press_velocity
-        self.list_enegry = []
+        self.list_energy = []
         self.list_time = []
         self.list_press = []
+        self.v_quad = 0
+        self.energy = 0
         self.t = 0
 
     def spawn_particles(self):
@@ -97,15 +100,23 @@ class Game:
             # ball_1.r  = ball_1.r + ball_1.radius
             # ball_2.r = ball_2.r + ball_2.radius
 
+    def pressure(self):
+        print(self.press_velocity)
+
+    def temperature(self):
+        T = self.energy / self.k
+        print(T)
+
     def total_energy(self):
-        return sum([self.list_balls[i].mass / 2 * self.list_balls[i].plot_vel_norm[i] ** 2
+        self.energy = sum([self.list_balls[i].mass / 2 * (self.list_balls[i].v[0] ** 2 + self.list_balls[i].v[1] ** 2)
                     for i in range(len(self.list_balls))])
 
     def energy_conserv(self):
-        plt.plot(self.t, self.list_enegry)
+        plt.plot(self.t, self.list_energy)
 
-    def pressure(self):
+    def fluct_pressure(self):
         time = [i * 50 for i in range(1, len(self.list_press) + 1)]
+        print(time)
         plt.plot(time, self.list_press)
 
     def isochoric(self):
@@ -122,21 +133,15 @@ class Game:
         plt.errorbar(list_v_quad, list_press, yerr=err, fmt='o')
 
     def speed_distribution(self):
-        m = self.list_balls[0].mass
-        T = self.p * self.A / (self.k * self.N)
+        v = np.arange(0., 30, 0.2)
+        plt.figure(figsize=(10, 8))
         plt.hist(self.vels, bins=15, density=True, label="Velocity distribution")
         plt.xlabel('speed')
         plt.ylabel('amount')
         plt.legend(loc='upper right')
         plt.title('speed distribution')
-        # v_quad = sum([self.list_balls[i].v[0] ** 2 + self.list_balls[i].v[1] ** 2 for i in
-        #               range(self.amount_balls)]) / self.amount_balls
-        # v = np.linspace(0, 10, 120)
-        # E = self.total_energy()
-        # Average_E = E / len(self.list_balls)
-        # T = 2 * Average_E / (2 * self.k)
-        # fv = self.N * (2 * v / v_quad ** 2) * np.exp(-v ** 2 / v_quad ** 2)
-        # plt.plot(v, fv)
+        plt.plot(v, (2 * v / self.v_quad ** 2) * np.exp(-v ** 2 / self.v_quad ** 2), 'r--', linewidth=5,
+                 label="Распределение Больцмана-Максвелла")
 
     def loop(self):
         clock = pygame.time.Clock()
@@ -144,29 +149,25 @@ class Game:
             if event.type == pygame.QUIT:
                 pygame.quit()
 
-            # if event.type == pygame.KEYDOWN and event.key == 102:
-            #     screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
-            #     w, h = pygame.display.get_surface().get_size()
-            # if event.type == pygame.KEYDOWN and event.key == 113:
-            #     screen = pygame.display.set_mode((screen_size, screen_size))
-
         self.screen.fill((0, 0, 0))
+
         self.t += 1
         for ball in self.list_balls:
             pygame.draw.circle(self.screen, pygame.Color("white"), ball.r, ball.radius)
             ball.move()
             self.wall_collision(ball)
-            # print(t)
+
         for i in range(self.amount_balls):
             self.vels[i] = (self.list_balls[i].v[0] ** 2 + self.list_balls[i].v[1] ** 2) ** 0.5
             for j in range(i + 1, self.amount_balls):
                 self.particle_collision(self.list_balls[i], self.list_balls[j])
-        v_quad = 0
-        for i in range(self.amount_balls):
-            v_quad += self.list_balls[i].v[0] ** 2 + self.list_balls[i].v[1] ** 2
+
+        self.v_quad = (sum([self.list_balls[i].v[0] ** 2 + self.list_balls[i].v[1] ** 2
+                       for i in range(self.amount_balls)]) / self.N) ** 0.5
         if self.t == 50:
             self.list_press.append(self.press_velocity)
-            print(str(self.press_velocity).replace('.', ','))
+            self.total_energy()
+            self.temperature()
             self.t = 0
             self.press_velocity = 0
 
@@ -187,7 +188,7 @@ class GameWidget(QWidget):
         # if box.text() != '0':
         #     self.game = Game(amount=int(box.text()))
         #     self.game.spawn_particles()
-        self.game = Game(amount=250)
+        self.game = Game(amount=100)
         self.game.spawn_particles()
         grid = QGridLayout(self)
         grid.setContentsMargins(1, 1, 1, 1)
@@ -203,7 +204,7 @@ class GameWidget(QWidget):
         gr_speed_d.clicked.connect(self.show_speed_distrib)
 
     def show_Press(self):
-        self.game.pressure()
+        self.game.fluct_pressure()
         plt.show()
 
     def show_speed_distrib(self):
@@ -222,6 +223,9 @@ class GameWidget(QWidget):
             p.drawImage(0, 0, img)
 
 
+def except_hook(cls, exception, traceback):
+    sys.__excepthook__(cls, exception, traceback)
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
@@ -229,4 +233,5 @@ if __name__ == "__main__":
     w.resize(850, 600)
     w.setWindowTitle('Визуализация модели идеального газа')
     w.show()
+    sys.excepthook = except_hook
     sys.exit(app.exec_())
