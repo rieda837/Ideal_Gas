@@ -40,7 +40,9 @@ class Game:
         self.N = self.amount_balls
         self.p = self.press_velocity
         self.list_enegry = []
-        self.t_2 = 0
+        self.list_time = []
+        self.list_press = []
+        self.t = 0
 
     def spawn_particles(self):
         min_distance = 15
@@ -99,9 +101,12 @@ class Game:
         return sum([self.list_balls[i].mass / 2 * self.list_balls[i].plot_vel_norm[i] ** 2
                     for i in range(len(self.list_balls))])
 
-    def energy_conserv(self, t):
-        self.t_2 += t
-        plt.plot(self.t_2, self.list_enegry)
+    def energy_conserv(self):
+        plt.plot(self.t, self.list_enegry)
+
+    def pressure(self):
+        time = [i * 50 for i in range(1, len(self.list_press) + 1)]
+        plt.plot(time, self.list_press)
 
     def isochoric(self):
         pass
@@ -124,18 +129,17 @@ class Game:
         plt.ylabel('amount')
         plt.legend(loc='upper right')
         plt.title('speed distribution')
-        v_quad = sum([self.list_balls[i].v[0] ** 2 + self.list_balls[i].v[1] ** 2 for i in
-                      range(self.amount_balls)]) / self.amount_balls
-        v = np.linspace(0, 10, 120)
-        E = self.total_energy()
-        Average_E = E / len(self.list_balls)
-        T = 2 * Average_E / (2 * self.k)
-        fv = self.N * (2 * v / v_quad ** 2) * np.exp(-v ** 2 / v_quad ** 2)
-        plt.plot(v, fv)
+        # v_quad = sum([self.list_balls[i].v[0] ** 2 + self.list_balls[i].v[1] ** 2 for i in
+        #               range(self.amount_balls)]) / self.amount_balls
+        # v = np.linspace(0, 10, 120)
+        # E = self.total_energy()
+        # Average_E = E / len(self.list_balls)
+        # T = 2 * Average_E / (2 * self.k)
+        # fv = self.N * (2 * v / v_quad ** 2) * np.exp(-v ** 2 / v_quad ** 2)
+        # plt.plot(v, fv)
 
     def loop(self):
         clock = pygame.time.Clock()
-        t = 0
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
@@ -147,7 +151,7 @@ class Game:
             #     screen = pygame.display.set_mode((screen_size, screen_size))
 
         self.screen.fill((0, 0, 0))
-        t +=  1
+        self.t += 1
         for ball in self.list_balls:
             pygame.draw.circle(self.screen, pygame.Color("white"), ball.r, ball.radius)
             ball.move()
@@ -160,11 +164,10 @@ class Game:
         v_quad = 0
         for i in range(self.amount_balls):
             v_quad += self.list_balls[i].v[0] ** 2 + self.list_balls[i].v[1] ** 2
-        print(t)
-        if t == 100:
+        if self.t == 50:
+            self.list_press.append(self.press_velocity)
             print(str(self.press_velocity).replace('.', ','))
-            self.energy_conserv(t)
-            t = 0
+            self.t = 0
             self.press_velocity = 0
 
         clock.tick(30)
@@ -174,8 +177,8 @@ class Game:
 class GameWidget(QWidget):
     def __init__(self):
         super().__init__()
-        gr_p_v = QPushButton()
-        gr_p_v.setText('Зависимость\n давления от скорости')
+        gr_press = QPushButton()
+        gr_press.setText('Давление')
         gr_speed_d = QPushButton()
         gr_speed_d.setText('Распределение\nскоростей')
         box = QSpinBox()
@@ -190,17 +193,17 @@ class GameWidget(QWidget):
         grid.setContentsMargins(1, 1, 1, 1)
         grid.setColumnStretch(1, 8)
         grid.addWidget(box, 1, 3, 1, 1)
-        grid.addWidget(gr_p_v, 2, 3, 1, 1)
+        grid.addWidget(gr_press, 2, 3, 1, 1)
         grid.addWidget(gr_speed_d, 3, 3, 1, 1)
 
         self.timer = QTimer()
         self.timer.timeout.connect(self.pygame_loop)
         self.timer.start(40)
-        gr_p_v.clicked.connect(self.show_P_Vq)
+        gr_press.clicked.connect(self.show_Press)
         gr_speed_d.clicked.connect(self.show_speed_distrib)
 
-    def show_P_Vq(self):
-        self.game.press_v_quad()
+    def show_Press(self):
+        self.game.pressure()
         plt.show()
 
     def show_speed_distrib(self):
@@ -219,8 +222,8 @@ class GameWidget(QWidget):
             p.drawImage(0, 0, img)
 
 
-if __name__ == "__main__":
 
+if __name__ == "__main__":
     app = QApplication(sys.argv)
     w = GameWidget()
     w.resize(850, 600)
