@@ -1,3 +1,3 @@
 # Ideal_Gas
 ## Программный код не содержит пользовательского интерфейса, созданного с помощью PyQT5 (этот код был описан в документации к конференции "Многообразие науки")
-![image](https://github.com/rieda837/Ideal_Gas/assets/125694953/cc9ba5f6-b33d-4e34-99fa-1fa3779b4dae)
+![image](https://github.com/rieda837/Ideal_Gas/assets/125694953/0edeb83c-c0f6-4e58-a40f-b9b2a0cab8ab)
