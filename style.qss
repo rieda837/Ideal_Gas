@@ -1,0 +1,36 @@
+QWidget {
+  background-color: #edede1;
+}
+QLabel {
+  color: #000;
+  font-weight: 200;
+}
+QLabel#heading {
+  color: #000;
+  font-size: 18px;
+  margin-bottom: 10px;
+}
+
+QSpinBox {
+    background-color: #fff;
+    padding-right: 15px; /* make room for the arrows */
+    border-image: url(:/images/frame.png) 4;
+    border-width: 3;
+}
+
+
+
+QPushButton {
+  background-color: #c2f0e6;
+  color: #000;
+  font-weight: 100;
+  border-radius: 8px;
+  border: 1px solid #7dbaad ;
+  padding: 5px 15px;
+  margin-top: 10px;
+  outline: 0px;
+}
+QPushButton:hover {
+  background-color: #6eb8a8;
+  border: 3px solid #578f83;
+}
