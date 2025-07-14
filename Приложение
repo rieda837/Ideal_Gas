@@ -300,7 +300,6 @@ if __name__ == "__main__":
     w = GameWidget()
     w.resize(920, 600)
     w.setWindowTitle('Симулятор идеального газа')
-    w.setWindowIcon(QIcon("C:/Users/User/Downloads/sim_icon.jpg"))
     w.setStyleSheet(Path('style.qss').read_text())
     w.show()
     sys.excepthook = except_hook
