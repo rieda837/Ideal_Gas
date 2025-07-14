@@ -3,10 +3,11 @@ import sys
 import random
 import matplotlib.pyplot as plt
 import numpy as np
-from PyQt5 import QtGui
-from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QSpinBox, QPushButton
-from PyQt5.QtCore import QTimer
-from PyQt5.QtGui import QImage, QPainter
+from pathlib import Path
+from PySide6 import QtGui
+from PySide6.QtWidgets import QApplication, QWidget, QLabel, QSpinBox, QPushButton, QHBoxLayout
+from PySide6.QtCore import QTimer, Qt, QRectF, QEvent, QObject
+from PySide6.QtGui import QImage, QPainter, QKeyEvent, QShortcut, QKeySequence, QIcon
 
 
 class Particle:
@@ -106,6 +107,9 @@ class Game:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_KP_ENTER:
+                    print('1')
 
         self.screen.fill((0, 0, 0))
 
@@ -167,11 +171,11 @@ class Game:
 
 
 class GameWidget(QWidget):
-    def __init__(self):
+    def __init__(self, parent=None):
         super().__init__()
 
         self.lab_particle = QLabel(self)
-        self.lab_particle.move(505, 5)
+        self.lab_particle.move(507  , 5)
         self.lab_particle.resize(180, 40)
         self.lab_particle.setText('Количество частиц:')
         self.lab_particle.setFont(QtGui.QFont("Times", 12))
@@ -185,7 +189,7 @@ class GameWidget(QWidget):
         self.lab_temp = QLabel(self)
         self.lab_temp.move(720, 5)
         self.lab_temp.resize(180, 40)
-        self.lab_temp.setText('Температура, К   :')
+        self.lab_temp.setText('Температура, К:')
         self.lab_temp.setFont(QtGui.QFont("Times", 12))
 
         self.put_temp = QSpinBox(self)
@@ -202,17 +206,17 @@ class GameWidget(QWidget):
         gr_press.clicked.connect(self.show_Press)
 
         gr_speed_d = QPushButton(self)
-        gr_speed_d.move(710, 90)
+        gr_speed_d.move(715, 90)
         gr_speed_d.resize(190, 55)
         gr_speed_d.setText('Распределение\nскоростей')
-        gr_speed_d.setFont(QtGui.QFont("Times", 12))
+        gr_speed_d.setFont(QtGui.QFont("Times", 10))
         gr_speed_d.clicked.connect(self.show_speed_distrib)
 
         start = QPushButton(self)
-        start.move(0, 500)
-        start.resize(900, 100)
+        start.move(0, 492)
+        start.resize(919, 107)
         start.setText('Начать\nмоделирование')
-        start.setFont(QtGui.QFont("Times", 16, QtGui.QFont.Bold))
+        start.setFont(QtGui.QFont("Times", 17))
         start.clicked.connect(self.start_simulation)
 
         self.game = Game(amount=100, temperature=1)
@@ -253,6 +257,9 @@ class GameWidget(QWidget):
         self.label_mass.setText(f'Масса молекулы аргона: 6,63e-26 кг')
         self.label_mass.setFont(QtGui.QFont("Times", 11))
 
+        self.shortcut_update = QShortcut(QKeySequence('Space'), self)
+        self.shortcut_update.activated.connect(self.start_simulation)
+
     def start_simulation(self):
         self.game = Game(amount=int(self.put_amount.text()), temperature=int(self.put_temp.text()))
         self.game.spawn_particles()
@@ -291,8 +298,10 @@ def except_hook(cls, exception, traceback):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     w = GameWidget()
-    w.resize(900, 600)
+    w.resize(920, 600)
     w.setWindowTitle('Симулятор идеального газа')
+    w.setWindowIcon(QIcon("C:/Users/User/Downloads/sim_icon.jpg"))
+    w.setStyleSheet(Path('style.qss').read_text())
     w.show()
     sys.excepthook = except_hook
-    sys.exit(app.exec_())
+    sys.exit(app.exec())
