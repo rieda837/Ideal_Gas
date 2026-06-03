@@ -1,17 +1,23 @@
 import pygame
 import sys
 import random
-import matplotlib.pyplot as plt
 import numpy as np
-from pathlib import Path
-from PySide6 import QtGui
-from PySide6.QtWidgets import QApplication, QWidget, QLabel, QSpinBox, QPushButton, QHBoxLayout
-from PySide6.QtCore import QTimer, Qt, QRectF, QEvent, QObject
-from PySide6.QtGui import QImage, QPainter, QKeyEvent, QShortcut, QKeySequence, QIcon
+import matplotlib
+
+# Указываем Matplotlib использовать PyQt5 для отрисовки графиков
+matplotlib.use('Qt5Agg')
+import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+
+from PyQt5 import QtGui, QtCore
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QSpinBox, QPushButton, QComboBox, QVBoxLayout
+from PyQt5.QtCore import QTimer
+from PyQt5.QtGui import QImage, QPainter
 
 
 class Particle:
-    def __init__(self, radius, velocity, r, mass):
+    def __init__(self, radius, velocity, r, mass, mode="Обычный"):
         self.radius = radius
         self.v = np.array(velocity)
         self.r = np.array(r)
@@ -19,51 +25,63 @@ class Particle:
         self.y = r[1]
         self.mass = mass
 
+        # Распределение цветов и типа газа в зависимости от режима
+        if mode == "Диффузия":
+            if self.x < 250:
+                self.color = (255, 60, 60)  # Красный для левой части
+                self.gas_type = "left"
+            else:
+                self.color = (60, 180, 255)  # Синий для правой части
+                self.gas_type = "right"
+        else:
+            self.color = (255, 255, 255)  # Белый для обычного режима
+            self.gas_type = "mono"
+
     def move(self):
         self.r = self.r + self.v
 
 
 class Game:
-    def __init__(self, amount=1, temperature=1):
+    def __init__(self, amount=1, temperature=1, mode="Обычный"):
         pygame.display.init()
         self.screen_size = 500
         self.screen = pygame.display.set_mode((self.screen_size, self.screen_size), pygame.HIDDEN)
         self.amount_balls = amount
+        self.mode = mode
         self.screen.fill((0, 0, 0))
         self.press_momentum = 0
-        self.vels = [None] * self.amount_balls
-        self.list_balls = [] * self.amount_balls
-        self.A = self.screen_size ** 2
+        self.vels = [0.0] * self.amount_balls
+        self.list_balls = []
         self.k = 1.38e-23
         self.N = self.amount_balls
-        self.p = self.press_momentum
-        self.list_energy = []
-        self.list_time = []
+
+        # Списки для графиков
         self.list_press = []
+        self.list_diffusion = []
+        self.list_energy = []
+
         self.v_quad = 0
         self.energy = 0
         self.t = 0
         self.T = temperature
-        self.dt = 0.2e-11  # 1 pxl per unit of time is 100 m/s
-        self.dl = 0.2e-9  # 1 pxl is 0.2 nm (radius of an argon atom)
+        self.dt = 0.2e-11
+        self.dl = 0.2e-9
         self.tree = [[], [], [], []]
         self.mass = 6.63e-26
 
     def spawn_particles(self):
         v0 = (2 * self.k * self.T / self.mass) ** 0.5 / (100 * 2 ** 0.5)
         for _ in range(self.amount_balls):
-            ball = Particle(1, (v0, v0), (random.randint(6, self.screen_size - 6),
-                                        random.randint(6, self.screen_size - 5)), 6e-26)
-
+            ball = Particle(2, (random.choice([-v0, v0]), random.choice([-v0, v0])),
+                            (random.randint(10, self.screen_size - 10),
+                             random.randint(10, self.screen_size - 10)), 6e-26, mode=self.mode)
             self.list_balls.append(ball)
 
     def particle_collision(self, ball_1, ball_2):
-        if ((ball_1.r[0] - ball_2.r[0]) ** 2 + (ball_1.r[1] - ball_2.r[1]) ** 2) <= 12:
+        if ((ball_1.r[0] - ball_2.r[0]) ** 2 + (ball_1.r[1] - ball_2.r[1]) ** 2) <= 16:
             if ball_1.r[0] != ball_2.r[0]:
-                v1 = ball_1.v
-                v2 = ball_2.v
-                r1 = ball_1.r
-                r2 = ball_2.r
+                v1, v2 = ball_1.v, ball_2.v
+                r1, r2 = ball_1.r, ball_2.r
                 d_r1 = r1 - r2
                 d_v1 = v1 - v2
                 d_r2 = r2 - r1
@@ -72,66 +90,43 @@ class Game:
                 ball_2.v = v2 - d_r2 * (d_v2 @ d_r2) / (d_r2[0] ** 2 + d_r2[1] ** 2)
 
     def total_energy(self):
+        if self.N == 0: return
         self.energy = sum(
-            [self.list_balls[i].mass / 2 *
-             ((100 * self.list_balls[i].v[0]) ** 2 +
-              (100 * self.list_balls[i].v[1]) ** 2)
+            [self.list_balls[i].mass / 2 * ((100 * self.list_balls[i].v[0]) ** 2 + (100 * self.list_balls[i].v[1]) ** 2)
              for i in range(len(self.list_balls))]) / self.N
 
     def temperature(self):
         self.total_energy()
         self.T = self.energy / (self.k * len(self.list_balls))
 
-    def fluct_pressure(self):
-        time = [i * 50 for i in range(1, len(self.list_press) + 1)]
-        plt.figure(figsize=(10, 8))
-        plt.xlabel('Время, с', fontsize=15)
-        plt.ylabel('Давление, Н/м', fontsize=15)
-        plt.title('Флуктуация давления')
-        plt.plot(time, self.list_press)
-
-    def speed_distribution(self):
-        v = np.arange(0., 1200, 0.2)
-        plt.figure(figsize=(11, 8))
-        plt.hist(self.vels, bins=15, density=True, label="Численное моделирование")
-        plt.xlabel('Скорость, м/с', fontsize=20)
-        plt.ylabel('Доля молекул в диапазоне скоростей 1 м/с', fontsize=20)
-        plt.tick_params(axis='both', which='major', labelsize=17)
-        plt.title('Распределение частиц по скоростям', fontsize=25)
-        plt.plot(v, (2 * v / (self.v_quad*100) ** 2) * np.exp(-v ** 2 / (self.v_quad * 100) ** 2), 'r--', linewidth=5,
-                 label="Распределение Больцмана-Максвелла")
-        plt.legend(loc='upper right', fontsize=15)
-
     def loop(self):
-        clock = pygame.time.Clock()
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_KP_ENTER:
-                    print('1')
 
-        self.screen.fill((0, 0, 0))
+        self.screen.fill((15, 15, 15))  # Темно-серый фон для лучшего контраста цветов
 
         self.t += 1
         for ball in self.list_balls:
-            pygame.draw.circle(self.screen, pygame.Color("white"), ball.r, ball.radius)
+            pygame.draw.circle(self.screen, ball.color, (int(ball.r[0]), int(ball.r[1])), ball.radius)
             ball.move()
+
             if ball.r[0] <= ball.radius:
                 ball.v[0] *= -1
-                ball.r[0] = ball.r[0] + ball.radius
+                ball.r[0] = ball.radius
                 self.press_momentum += ball.mass * abs(100 * ball.v[0]) * 2
             elif ball.r[0] >= self.screen_size - ball.radius:
                 ball.v[0] *= -1
-                ball.r[0] = ball.r[0] - ball.radius
+                ball.r[0] = self.screen_size - ball.radius
                 self.press_momentum += ball.mass * abs(100 * ball.v[0]) * 2
-            elif ball.r[1] <= ball.radius:
+
+            if ball.r[1] <= ball.radius:
                 ball.v[1] *= -1
-                ball.r[1] = ball.r[1] + ball.radius
+                ball.r[1] = ball.radius
                 self.press_momentum += ball.mass * abs(100 * ball.v[1]) * 2
             elif ball.r[1] >= self.screen_size - ball.radius:
                 ball.v[1] *= -1
-                ball.r[1] = ball.r[1] - ball.radius
+                ball.r[1] = self.screen_size - ball.radius
                 self.press_momentum += ball.mass * abs(100 * ball.v[1]) * 2
 
         self.tree[0].clear()
@@ -150,32 +145,102 @@ class Game:
                 else:
                     self.tree[2].append(ball)
 
-        for k in [0, 1, 2, 3]:
+        for k in range(4):
             for i in range(len(self.tree[k])):
                 for j in range(i + 1, len(self.tree[k])):
                     self.particle_collision(self.tree[k][i], self.tree[k][j])
+
         self.vels = [(ball.v[0] ** 2 + ball.v[1] ** 2) ** 0.5 * 100 for ball in self.list_balls]
 
-        self.v_quad = (sum([self.list_balls[i].v[0] ** 2 + self.list_balls[i].v[1] ** 2
-                            for i in range(self.amount_balls)]) / self.N) ** 0.5
-        if self.t == 50:
-            self.list_press.append(self.press_momentum / (4 * 500 * 0.2e-9 * 50 * self.dt))
+        if self.N > 0:
+            self.v_quad = (sum([b.v[0] ** 2 + b.v[1] ** 2 for b in self.list_balls]) / self.N) ** 0.5
+
+        if self.t >= 50:
+            cur_press = self.press_momentum / (4 * 500 * 0.2e-9 * 50 * self.dt)
+            self.list_press.append(cur_press)
+
+            # Подсчет коэффициента смешивания для диффузии
+            mixed = 0
+            if self.mode == "Диффузия":
+                mixed = sum(1 for b in self.list_balls if
+                            (b.gas_type == "left" and b.r[0] >= 250) or (b.gas_type == "right" and b.r[0] < 250))
+            self.list_diffusion.append(mixed / self.amount_balls)
+
             self.total_energy()
             self.list_energy.append(self.energy)
             self.temperature()
             self.t = 0
             self.press_momentum = 0
 
-        clock.tick(30)
-        pygame.display.flip()
+
+# Класс для дополнительного окна с графиками
+class RealTimeGraphWindow(QWidget):
+    def __init__(self, game_instance):
+        super().__init__()
+        self.game = game_instance
+        self.setWindowTitle("Графики в реальном времени")
+        self.resize(900, 450)
+
+        self.figure = Figure(figsize=(9, 4), dpi=100)
+        self.canvas = FigureCanvas(self.figure)
+
+        self.ax_press = self.figure.add_subplot(121)
+        self.ax_speed = self.figure.add_subplot(122)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.canvas)
+        self.setLayout(layout)
+
+    def update_charts(self):
+        if not self.game.list_balls:
+            return
+
+        # 1. График давления и диффузии
+        self.ax_press.clear()
+        time_steps = [i * 50 for i in range(1, len(self.game.list_press) + 1)]
+
+        if time_steps:
+            self.ax_press.plot(time_steps, self.game.list_press, 'r-', label="Давление")
+
+            if self.game.mode == "Диффузия":
+                ax2 = self.ax_press.twinx()
+                ax2.clear()
+                ax2.plot(time_steps, self.game.list_diffusion, 'g-', label="Смешивание", alpha=0.6)
+                ax2.set_ylabel('Коэффициент смешивания', color='g')
+                ax2.tick_params(axis='y', labelcolor='g')
+
+        self.ax_press.set_xlabel('Время (шаги)')
+        self.ax_press.set_ylabel('Давление')
+        self.ax_press.set_title('Динамика давления и диффузии')
+        self.ax_press.grid(True, linestyle='--', alpha=0.5)
+
+        # 2. График распределения скоростей
+        self.ax_speed.clear()
+        if self.game.vels:
+            self.ax_speed.hist(self.game.vels, bins=15, density=True, color='gray', alpha=0.6, label="Симуляция")
+
+            v_axis = np.arange(0., 1500, 5)
+            v_q = self.game.v_quad * 100
+            if v_q > 0:
+                f_v = (2 * v_axis / (v_q ** 2)) * np.exp(-v_axis ** 2 / (v_q ** 2))
+                self.ax_speed.plot(v_axis, f_v, 'r--', linewidth=2, label="Максвелл-Больцман")
+
+        self.ax_speed.set_xlabel('Скорость (м/с)')
+        self.ax_speed.set_ylabel('Доля молекул')
+        self.ax_speed.set_title('Распределение скоростей')
+        self.ax_speed.legend(loc='upper right', fontsize=8)
+        self.ax_speed.grid(True, linestyle='--', alpha=0.5)
+
+        self.figure.tight_layout()
+        self.canvas.draw()
 
 
 class GameWidget(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self):
         super().__init__()
 
         self.lab_particle = QLabel(self)
-        self.lab_particle.move(507  , 5)
+        self.lab_particle.move(505, 5)
         self.lab_particle.resize(180, 40)
         self.lab_particle.setText('Количество частиц:')
         self.lab_particle.setFont(QtGui.QFont("Times", 12))
@@ -183,112 +248,134 @@ class GameWidget(QWidget):
         self.put_amount = QSpinBox(self)
         self.put_amount.move(505, 40)
         self.put_amount.resize(180, 35)
-        self.put_amount.setRange(1, 1000)
+        self.put_amount.setRange(10, 2000)
+        self.put_amount.setValue(400)
         self.put_amount.setFont(QtGui.QFont("Times", 11))
 
         self.lab_temp = QLabel(self)
         self.lab_temp.move(720, 5)
         self.lab_temp.resize(180, 40)
-        self.lab_temp.setText('Температура, К:')
+        self.lab_temp.setText('Температура:')
         self.lab_temp.setFont(QtGui.QFont("Times", 12))
 
         self.put_temp = QSpinBox(self)
         self.put_temp.move(720, 40)
         self.put_temp.resize(180, 35)
-        self.put_temp.setRange(1, 10000)
+        self.put_temp.setRange(10, 10000)
+        self.put_temp.setValue(400)
         self.put_temp.setFont(QtGui.QFont("Times", 12))
 
-        gr_press = QPushButton(self)
-        gr_press.move(505, 90)
-        gr_press.resize(185, 55)
-        gr_press.setText('Давление')
-        gr_press.setFont(QtGui.QFont("Times", 12))
-        gr_press.clicked.connect(self.show_Press)
+        # Единая кнопка вызова графиков
+        self.btn_graphs = QPushButton(self)
+        self.btn_graphs.move(505, 90)
+        self.btn_graphs.resize(395, 55)
+        self.btn_graphs.setText('Открыть окно графиков')
+        self.btn_graphs.setFont(QtGui.QFont("Times", 12))
+        self.btn_graphs.clicked.connect(self.show_graphs_window)
 
-        gr_speed_d = QPushButton(self)
-        gr_speed_d.move(715, 90)
-        gr_speed_d.resize(190, 55)
-        gr_speed_d.setText('Распределение\nскоростей')
-        gr_speed_d.setFont(QtGui.QFont("Times", 10))
-        gr_speed_d.clicked.connect(self.show_speed_distrib)
+        self.lab_mode = QLabel(self)
+        self.lab_mode.move(505, 150)
+        self.lab_mode.resize(180, 25)
+        self.lab_mode.setText('Режим симуляции:')
+        self.lab_mode.setFont(QtGui.QFont("Times", 12))
 
-        start = QPushButton(self)
-        start.move(0, 492)
-        start.resize(919, 107)
-        start.setText('Начать\nмоделирование')
-        start.setFont(QtGui.QFont("Times", 17))
-        start.clicked.connect(self.start_simulation)
-
-        self.game = Game(amount=100, temperature=1)
+        self.combo_mode = QComboBox(self)
+        self.combo_mode.move(505, 175)
+        self.combo_mode.resize(185, 30)
+        self.combo_mode.addItems(["Обычный", "Диффузия"])
+        self.combo_mode.setFont(QtGui.QFont("Times", 11))
 
         self.label_gas = QLabel(self)
-        self.label_gas.move(585, 150)
-        self.label_gas.resize(244, 50)
-        self.label_gas.setText(f'Газ модели - аргон.')
-        self.label_gas.setFont(QtGui.QFont("Times", 16))
+        self.label_gas.move(710, 150)
+        self.label_gas.resize(180, 50)
+        self.label_gas.setText('Газ модели - аргон.')
+        self.label_gas.setFont(QtGui.QFont("Times", 12))
 
         self.label_press = QLabel(self)
         self.label_press.move(505, 210)
-        self.label_press.resize(270, 50)
-        self.label_press.setText(f'Давление: 0 Н/м')
+        self.label_press.resize(380, 50)
+        self.label_press.setText('Давление: 0 Н/м')
         self.label_press.setFont(QtGui.QFont("Times", 11))
 
         self.label_v_quad = QLabel(self)
         self.label_v_quad.move(505, 260)
-        self.label_v_quad.resize(275, 50)
-        self.label_v_quad.setText(f'Средняя квадратичная скорость:\n{round(self.game.v_quad * 100)} м/с')
+        self.label_v_quad.resize(380, 50)
+        self.label_v_quad.setText('Средняя квадратичная скорость:\n0 м/с')
         self.label_v_quad.setFont(QtGui.QFont("Times", 11))
 
         self.label_scale = QLabel(self)
         self.label_scale.move(505, 325)
         self.label_scale.resize(390, 50)
-        self.label_scale.setText(f'Масштаб: 1 пиксель = 0,2 нм\n(окно 500 на 500 пикселей)')
+        self.label_scale.setText('Масштаб: 1 пиксель = 0,2 нм\n(окно 500 на 500 пикселей)')
         self.label_scale.setFont(QtGui.QFont("Times", 11))
 
         self.label_time = QLabel(self)
         self.label_time.move(505, 385)
         self.label_time.resize(390, 50)
-        self.label_time.setText(f'Шаг итерации (шаг по времени):\n2 пикосекунды')
+        self.label_time.setText('Шаг итерации (шаг по времени):\n2 пикосекунды')
         self.label_time.setFont(QtGui.QFont("Times", 11))
 
         self.label_mass = QLabel(self)
         self.label_mass.move(505, 440)
         self.label_mass.resize(390, 50)
-        self.label_mass.setText(f'Масса молекулы аргона: 6,63e-26 кг')
+        self.label_mass.setText('Масса молекулы аргона: 6,63e-26 кг')
         self.label_mass.setFont(QtGui.QFont("Times", 11))
 
-        self.shortcut_update = QShortcut(QKeySequence('Space'), self)
-        self.shortcut_update.activated.connect(self.start_simulation)
+        start = QPushButton(self)
+        start.move(0, 500)
+        start.resize(900, 100)
+        start.setText('Начать моделирование')
+        start.setFont(QtGui.QFont("Times", 16, QtGui.QFont.Bold))
+        start.clicked.connect(self.start_simulation)
+
+        self.game = None
+        self.graph_window = None
 
     def start_simulation(self):
-        self.game = Game(amount=int(self.put_amount.text()), temperature=int(self.put_temp.text()))
+        selected_mode = self.combo_mode.currentText()
+        self.game = Game(amount=int(self.put_amount.text()),
+                         temperature=int(self.put_temp.text()),
+                         mode=selected_mode)
         self.game.spawn_particles()
+
+        # Автоматически открываем окно графиков при старте
+        self.show_graphs_window()
+
         self.timer = QTimer()
         self.timer.timeout.connect(self.pygame_loop)
-        self.timer.start(40)
+        self.timer.start(30)
 
-    def show_Press(self):
-        self.game.fluct_pressure()
-        plt.show()
-
-    def show_speed_distrib(self):
-        self.game.speed_distribution()
-        plt.show()
+    def show_graphs_window(self):
+        if self.game:
+            if self.graph_window is not None:
+                self.graph_window.close()
+            self.graph_window = RealTimeGraphWindow(self.game)
+            self.graph_window.show()
 
     def pygame_loop(self):
-        self.game.loop()
-        self.label_v_quad.setText(f'Средняя квадратичная скорость:\n{round(self.game.v_quad * 100)} м/с')
-        if self.game.t == 49:
-            self.label_press.setText(
-                f'Давление: {str(self.game.press_momentum / (4 * 500 * 0.2e-9 * 50 * self.game.dt))[:-8]} Н/м')
-        self.update(0, 0, 500, 500)
+        if self.game:
+            self.game.loop()
+            self.label_v_quad.setText(f'Средняя квадратичная скорость:\n{round(self.game.v_quad * 100)} м/с')
+            if len(self.game.list_press) > 0:
+                self.label_press.setText(
+                    f'Давление: {str(self.game.list_press[-1])[:7]} Н/м')
+
+            # Обновление окна с графиками
+            if self.graph_window and self.graph_window.isVisible():
+                if random.random() < 0.15 or self.game.t == 49:
+                    self.graph_window.update_charts()
+
+            self.update(0, 0, 500, 500)
 
     def paintEvent(self, e):
+        p = QPainter(self)
         if self.game:
             buf = self.game.screen.get_buffer()
             img = QImage(buf, 500, 500, QImage.Format_RGB32)
-            p = QPainter(self)
             p.drawImage(0, 0, img)
+        else:
+            # Черный экран до запуска симуляции
+            p.fillRect(0, 0, 500, 500, QtGui.QColor(0, 0, 0))
 
 
 def except_hook(cls, exception, traceback):
@@ -296,11 +383,13 @@ def except_hook(cls, exception, traceback):
 
 
 if __name__ == "__main__":
+    QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling, True)
     app = QApplication(sys.argv)
+    with open('style.qss', encoding="utf-8") as f:
+        app.setStyleSheet(f.read())
     w = GameWidget()
-    w.resize(920, 600)
+    w.resize(900, 600)
     w.setWindowTitle('Симулятор идеального газа')
-    w.setStyleSheet(Path('style.qss').read_text())
     w.show()
     sys.excepthook = except_hook
-    sys.exit(app.exec())
+    sys.exit(app.exec_())
